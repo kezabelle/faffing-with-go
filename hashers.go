@@ -4,16 +4,28 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"golang.org/x/crypto/pbkdf2"
 	"hash"
+	"strconv"
 	"strings"
 )
 
 var (
-	SHA1 = CrapPasswordHasher{encoder: &SHA1PasswordHasher{}}
-	MD5  = CrapPasswordHasher{encoder: &MD5PasswordHasher{}}
+	SHA1               = CrapPasswordHasher{configuration: &SHA1PasswordHasher{}}
+	MD5                = CrapPasswordHasher{configuration: &MD5PasswordHasher{}}
+	DJ_21_PBKDF2      = PBKDF2PasswordHasher{iterations: 120000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_21_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 120000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_20_PBKDF2      = PBKDF2PasswordHasher{iterations: 100000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_20_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 100000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_111_PBKDF2      = PBKDF2PasswordHasher{iterations: 36000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_111_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 36000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	//UnsaltedSHA1 = CrapPasswordHasher{configuration: &UnsaltedSHA1PasswordHasher{}}
+	//UnsaltedMD5 = CrapPasswordHasher{configuration: &UnsaltedMD5PasswordHasher{}}
 )
 
 func GetRandomString(length int) string {
@@ -28,51 +40,60 @@ func GetRandomString(length int) string {
 
 // All the hashers should have this.
 type Hasher interface {
-	Salt()
-	Verify()
-	Encode()
-	MustUpdate()
-	SafeSummary()
+	Salt() string
+	Verify(string, string) int
+	Encode(string, string) (string, error)
+	//MustUpdate()
+	//SafeSummary()
 }
 
 // CrapPasswordHasher has an embedded Encoderer so that it can share the whole implementation except for the
-// name and encoder (eg: need to swap out sha1.New() or md5.New()
+// name and configuration (eg: need to swap out sha1.New() or md5.New()
 type Encoderer interface {
-	GetEncoder() hash.Hash
-	GetAlgorithm() string
+	Encoder() func() hash.Hash
+	Algorithm() string
+	Salt() string
 }
 
-type SHA1PasswordHasher struct{}
-
-func (s *SHA1PasswordHasher) GetEncoder() hash.Hash {
-	return sha1.New()
+type SHA1PasswordHasher struct {
 }
 
-func (s *SHA1PasswordHasher) GetAlgorithm() string {
+func (s *SHA1PasswordHasher) Encoder() func() hash.Hash {
+	return sha1.New
+}
+
+func (s *SHA1PasswordHasher) Algorithm() string {
 	return "sha1"
 }
-
-type MD5PasswordHasher struct{}
-
-func (m *MD5PasswordHasher) GetEncoder() hash.Hash {
-	return md5.New()
+func (s *SHA1PasswordHasher) Salt() string {
+	return GetRandomString(12)
 }
-func (m *MD5PasswordHasher) GetAlgorithm() string {
+
+type MD5PasswordHasher struct {
+}
+
+func (m *MD5PasswordHasher) Encoder() func() hash.Hash {
+	return md5.New
+}
+func (m *MD5PasswordHasher) Algorithm() string {
 	return "md5"
+}
+func (s *MD5PasswordHasher) Salt() string {
+	return GetRandomString(12)
 }
 
 type CrapPasswordHasher struct {
-	encoder Encoderer // lets us keep the main implementation but swap out sha1.New() for md5.New() etc.
+	configuration Encoderer // lets us keep the main implementation but swap out sha1.New() for md5.New() etc.
 }
 
-func (hasher *CrapPasswordHasher) Salt() string {
-	return GetRandomString(12)
+func (h *CrapPasswordHasher) Salt() string {
+	return h.configuration.Salt()
 }
 
 func (h *CrapPasswordHasher) Verify(password string, encoded string) int {
 	split := strings.SplitN(encoded, "$", 3)
 	alorithm := split[0]
-	if alorithm != h.encoder.GetAlgorithm() {
+	if alorithm != h.configuration.Algorithm() {
 		return 0
 	}
 	encoded2, _ := h.Encode(password, split[1])
@@ -83,10 +104,69 @@ func (h *CrapPasswordHasher) Encode(password string, salt string) (string, error
 	if strings.Contains(salt, "$") {
 		return "", errors.New("$ in Salt")
 	}
-	sha1b := h.encoder.GetEncoder()
-	sha1b.Write([]byte(salt + password))
-	hash := hex.EncodeToString(sha1b.Sum(nil))
+	hasher := h.configuration.Encoder()()
+	hasher.Write([]byte(salt + password))
+	hash := hex.EncodeToString(hasher.Sum(nil))
 
-	all := h.encoder.GetAlgorithm() + "$" + salt + "$" + hash
+	all := h.configuration.Algorithm() + "$" + salt + "$" + hash
 	return all, nil
+}
+
+type PBKDF2SHA256 struct{}
+
+func (m *PBKDF2SHA256) Encoder() func() hash.Hash {
+	return sha256.New
+}
+func (m *PBKDF2SHA256) Algorithm() string {
+	return "pbkdf2_sha256"
+}
+func (s *PBKDF2SHA256) Salt() string {
+	return GetRandomString(12)
+}
+
+type PBKDF2SHA1 struct{}
+
+func (m *PBKDF2SHA1) Encoder() func() hash.Hash {
+	return sha1.New
+}
+func (m *PBKDF2SHA1) Algorithm() string {
+	return "pbkdf2_sha1"
+}
+func (s *PBKDF2SHA1) Salt() string {
+	return GetRandomString(12)
+}
+
+type PBKDF2PasswordHasher struct {
+	iterations    int
+	keylen        int
+	configuration Encoderer
+}
+
+func (h *PBKDF2PasswordHasher) Encode(password string, salt string, iterations int) (string, error) {
+	if strings.Contains(salt, "$") {
+		return "", errors.New("$ in Salt")
+	}
+	if iterations == 0 {
+		iterations = h.iterations
+	}
+	hasher := h.configuration.Encoder()
+	key := pbkdf2.Key([]byte(password), []byte(salt), iterations, h.keylen, hasher)
+	hash := strings.TrimSpace(base64.StdEncoding.EncodeToString(key))
+	all := h.configuration.Algorithm() + "$" + strconv.Itoa(iterations) + "$" + salt + "$" + hash
+	return all, nil
+}
+func (h *PBKDF2PasswordHasher) Verify(password string, encoded string) int {
+	split := strings.SplitN(encoded, "$", 4)
+	algorithm := split[0]
+	salt := split[2]
+	_ = split[3] // hash
+	if algorithm != h.configuration.Algorithm() {
+		return 0
+	}
+	iterations, err := strconv.Atoi(split[1])
+	if err != nil {
+		return 0
+	}
+	encoded2, _ := h.Encode(password, salt, iterations)
+	return subtle.ConstantTimeCompare([]byte(encoded), []byte(encoded2))
 }
