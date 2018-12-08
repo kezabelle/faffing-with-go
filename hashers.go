@@ -18,12 +18,16 @@ import (
 var (
 	SHA1               = CrapPasswordHasher{configuration: &SHA1PasswordHasher{}}
 	MD5                = CrapPasswordHasher{configuration: &MD5PasswordHasher{}}
-	DJ_21_PBKDF2      = PBKDF2PasswordHasher{iterations: 120000, keylen: 32, configuration: &PBKDF2SHA256{}}
-	DJ_21_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 120000, keylen: 20, configuration: &PBKDF2SHA1{}}
-	DJ_20_PBKDF2      = PBKDF2PasswordHasher{iterations: 100000, keylen: 32, configuration: &PBKDF2SHA256{}}
-	DJ_20_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 100000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_21_PBKDF2       = PBKDF2PasswordHasher{iterations: 120000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_21_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 120000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_20_PBKDF2       = PBKDF2PasswordHasher{iterations: 100000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_20_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 100000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_111_PBKDF2      = PBKDF2PasswordHasher{iterations: 36000, keylen: 32, configuration: &PBKDF2SHA256{}}
 	DJ_111_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 36000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_18_PBKDF2       = PBKDF2PasswordHasher{iterations: 20000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_18_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 20000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_14_PBKDF2       = PBKDF2PasswordHasher{iterations: 10000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_14_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 10000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	//UnsaltedSHA1 = CrapPasswordHasher{configuration: &UnsaltedSHA1PasswordHasher{}}
 	//UnsaltedMD5 = CrapPasswordHasher{configuration: &UnsaltedMD5PasswordHasher{}}
 )
@@ -43,8 +47,8 @@ type Hasher interface {
 	Salt() string
 	Verify(string, string) int
 	Encode(string, string) (string, error)
-	//MustUpdate()
-	//SafeSummary()
+	MustUpdate() bool
+	SafeSummary()
 }
 
 // CrapPasswordHasher has an embedded Encoderer so that it can share the whole implementation except for the
@@ -86,9 +90,9 @@ type CrapPasswordHasher struct {
 	configuration Encoderer // lets us keep the main implementation but swap out sha1.New() for md5.New() etc.
 }
 
-func (h *CrapPasswordHasher) Salt() string {
-	return h.configuration.Salt()
-}
+//func (h *CrapPasswordHasher) Salt() string {
+//	return h.configuration.Salt()
+//}
 
 func (h *CrapPasswordHasher) Verify(password string, encoded string) int {
 	split := strings.SplitN(encoded, "$", 3)
@@ -110,6 +114,9 @@ func (h *CrapPasswordHasher) Encode(password string, salt string) (string, error
 
 	all := h.configuration.Algorithm() + "$" + salt + "$" + hash
 	return all, nil
+}
+func (h *CrapPasswordHasher) MustUpdate(encoded string) bool {
+	return false
 }
 
 type PBKDF2SHA256 struct{}
@@ -142,12 +149,13 @@ type PBKDF2PasswordHasher struct {
 	configuration Encoderer
 }
 
-func (h *PBKDF2PasswordHasher) Encode(password string, salt string, iterations int) (string, error) {
+func (h *PBKDF2PasswordHasher) Encode(password string, salt string) (string, error) {
+	return h.EncodeIterations(password, salt, h.iterations)
+}
+
+func (h *PBKDF2PasswordHasher) EncodeIterations(password string, salt string, iterations int) (string, error) {
 	if strings.Contains(salt, "$") {
 		return "", errors.New("$ in Salt")
-	}
-	if iterations == 0 {
-		iterations = h.iterations
 	}
 	hasher := h.configuration.Encoder()
 	key := pbkdf2.Key([]byte(password), []byte(salt), iterations, h.keylen, hasher)
@@ -167,6 +175,47 @@ func (h *PBKDF2PasswordHasher) Verify(password string, encoded string) int {
 	if err != nil {
 		return 0
 	}
-	encoded2, _ := h.Encode(password, salt, iterations)
+	encoded2, _ := h.EncodeIterations(password, salt, iterations)
 	return subtle.ConstantTimeCompare([]byte(encoded), []byte(encoded2))
+}
+
+func (h *PBKDF2PasswordHasher) MustUpdate(encoded string) bool {
+	split := strings.SplitN(encoded, "$", 4)
+	iterations, err := strconv.Atoi(split[1])
+	if err != nil {
+		return true
+	}
+	return iterations != h.iterations
+}
+
+//type BCryptPasswordHasher struct {
+//}
+//func (h *BCryptPasswordHasher) Salt() (string) {
+//	return "???"
+//}
+//func (h *BCryptPasswordHasher) Encode(password string, salt string) (string, error) {
+//	return "", nil
+//}
+//func (h *BCryptPasswordHasher) Verify(password string, encoded string) int {
+//	return 0
+//}
+//func (h *BCryptPasswordHasher) MustUpdate(encoded string) bool {
+//	return false
+//}
+
+type Argon2PasswordHasher struct {
+}
+
+func (h *Argon2PasswordHasher) Salt() (string) {
+	return GetRandomString(12)
+}
+func (h *Argon2PasswordHasher) Encode(password string, salt string) (string, error) {
+	return "", nil
+}
+func (h *Argon2PasswordHasher) Verify(password string, encoded string) int {
+	return 0
+}
+
+func (h *Argon2PasswordHasher) MustUpdate(encoded string) bool {
+	return false
 }
