@@ -47,7 +47,7 @@ type Hasher interface {
 	Salt() string
 	Verify(string, string) int
 	Encode(string, string) (string, error)
-	MustUpdate() bool
+	ShouldUpdate() bool
 	SafeSummary()
 }
 
@@ -115,7 +115,7 @@ func (h *CrapPasswordHasher) Encode(password string, salt string) (string, error
 	all := h.configuration.Algorithm() + "$" + salt + "$" + hash
 	return all, nil
 }
-func (h *CrapPasswordHasher) MustUpdate(encoded string) bool {
+func (h *CrapPasswordHasher) ShouldUpdate(encoded string) bool {
 	return false
 }
 
@@ -179,7 +179,7 @@ func (h *PBKDF2PasswordHasher) Verify(password string, encoded string) int {
 	return subtle.ConstantTimeCompare([]byte(encoded), []byte(encoded2))
 }
 
-func (h *PBKDF2PasswordHasher) MustUpdate(encoded string) bool {
+func (h *PBKDF2PasswordHasher) ShouldUpdate(encoded string) bool {
 	split := strings.SplitN(encoded, "$", 4)
 	iterations, err := strconv.Atoi(split[1])
 	if err != nil {
@@ -191,6 +191,7 @@ func (h *PBKDF2PasswordHasher) MustUpdate(encoded string) bool {
 //type BCryptPasswordHasher struct {
 //}
 //func (h *BCryptPasswordHasher) Salt() (string) {
+//  // Example from BCryptSHA256PasswordHasher().salt() = $2b$12$nTBSvTeELovV9.lPZLBCtu / $2b$12$zf8jrSLSgnPhy..1H090he
 //	return "???"
 //}
 //func (h *BCryptPasswordHasher) Encode(password string, salt string) (string, error) {
@@ -199,23 +200,34 @@ func (h *PBKDF2PasswordHasher) MustUpdate(encoded string) bool {
 //func (h *BCryptPasswordHasher) Verify(password string, encoded string) int {
 //	return 0
 //}
-//func (h *BCryptPasswordHasher) MustUpdate(encoded string) bool {
+//func (h *BCryptPasswordHasher) ShouldUpdate(encoded string) bool {
 //	return false
 //}
 
-type Argon2PasswordHasher struct {
-}
+//type Argon2PasswordHasher struct {
+//}
+//
+//func (h *Argon2PasswordHasher) Salt() (string) {
+//	return GetRandomString(12)
+//}
+//func (h *Argon2PasswordHasher) Encode(password string, salt string) (string, error) {
+// argon2, for pw: test, salt: woofwoofwoof (woof is too short)
+// argon2$argon2i$v=19$m=512,t=2,p=2$d29vZndvb2Z3b29m$NadkcmUilrgla3/+HH78Ew
+// t=time_cost, p=parallelism, v=version?, m=memory_cost, argon2i = not id.
+// DEFAULT_HASH_LENGTH = 16?
 
-func (h *Argon2PasswordHasher) Salt() (string) {
-	return GetRandomString(12)
-}
-func (h *Argon2PasswordHasher) Encode(password string, salt string) (string, error) {
-	return "", nil
-}
-func (h *Argon2PasswordHasher) Verify(password string, encoded string) int {
-	return 0
-}
-
-func (h *Argon2PasswordHasher) MustUpdate(encoded string) bool {
-	return false
-}
+// >>> from argon2.low_level import, hash_secret_raw,  Type
+// >>> hash_secret_raw(b'test', b'woofwoofwoof', 2, 512, 2, 16, Type.I)
+// b'5\xa7dre"\x96\xb8%k\x7f\xfe\x1c~\xfc\x13'
+//
+// key := argon2.Key([]byte("test"), []byte("woofwoofwoof"), 2, 512, 2, 16)
+// fmt.Printf("%q\n", key)
+//	return "", nil
+//}
+//func (h *Argon2PasswordHasher) Verify(password string, encoded string) int {
+//	return 0
+//}
+//
+//func (h *Argon2PasswordHasher) ShouldUpdate(encoded string) bool {
+//	return false
+//}

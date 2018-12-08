@@ -36,6 +36,7 @@ var pbkdf2s = []PDBKDF2{
 	{"Django 1.4 (LTS) PBKDF2, SHA1", "pbkdf2_sha1$10000$woof$QB91axouI/E12QORKgNkHAF8o0Y=", DJ_14_PBKDF2_SHA1},
 }
 
+
 func TestCrapPasswordHasher_Encode(t *testing.T) {
 	for _, hashable := range hashables {
 		t.Run(hashable.name, func(t *testing.T) {
