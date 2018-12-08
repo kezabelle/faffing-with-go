@@ -98,3 +98,31 @@ func TestPBKDF2PasswordHasher_Verify(t *testing.T) {
 		})
 	}
 }
+
+
+func TestArgon2PasswordHasher_Encode(t *testing.T) {
+	a := Argon2PasswordHasher{}
+	encoded, _ := a.Encode("test", "woofwoofwoof")
+	expected := "argon2$argon2i$v=19$m=512,t=2,p=2$d29vZndvb2Z3b29m$NadkcmUilrgla3/+HH78Ew"
+	if encoded != expected {
+		t.Errorf("Expected %s, got %s", expected, encoded)
+	}
+}
+
+
+func TestArgon2PasswordHasher_Verify(t *testing.T) {
+	a := Argon2PasswordHasher{}
+	encoded, _ := a.Encode("test", "woofwoofwoof")
+	t.Run("Match", func(t *testing.T) {
+		result := a.Verify("test", encoded)
+		if result == 0 {
+			t.Error("Verifying encoded password didn't work")
+		}
+	})
+	t.Run("Doesn't match", func(t *testing.T) {
+		result := a.Verify("test2", encoded)
+		if result != 0 {
+			t.Error("Verifying encoded password didn't work")
+		}
+	})
+}
