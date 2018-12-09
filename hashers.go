@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/matthewhartstonge/argon2"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/pbkdf2"
 	"hash"
 	"strconv"
@@ -17,8 +18,11 @@ import (
 )
 
 var (
-	SHA1               = CrapPasswordHasher{&SHA1PasswordHasher{}}
-	MD5                = CrapPasswordHasher{&MD5PasswordHasher{}}
+	BCrypt             = BCryptPasswordHasher{&bcryptNoSHA{}}
+	BCryptSHA256       = BCryptPasswordHasher{&bcryptSHA256{}}
+	Argon2             = Argon2PasswordHasher{}
+	SHA1               = CrapPasswordHasher{&sha1PasswordHasher{}}
+	MD5                = CrapPasswordHasher{&md5PasswordHasher{}}
 	DJ_21_PBKDF2       = PBKDF2PasswordHasher{iterations: 120000, keylen: 32, configuration: &PBKDF2SHA256{}}
 	DJ_21_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 120000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_20_PBKDF2       = PBKDF2PasswordHasher{iterations: 100000, keylen: 32, configuration: &PBKDF2SHA256{}}
@@ -38,6 +42,7 @@ var (
 var _ Hasher = (*CrapPasswordHasher)(nil)
 var _ Hasher = (*PBKDF2PasswordHasher)(nil)
 var _ Hasher = (*Argon2PasswordHasher)(nil)
+var _ Hasher = (*BCryptPasswordHasher)(nil)
 
 func GetRandomString(length int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -51,7 +56,7 @@ func GetRandomString(length int) string {
 
 // All the hashers should have this.
 type Hasher interface {
-	//Salt() string
+	Salt() string
 	Verify(string, string) int
 	Encode(string, string) (string, error)
 	//ShouldUpdate() bool
@@ -66,30 +71,30 @@ type Encoderer interface {
 	Salt() string
 }
 
-type SHA1PasswordHasher struct {
+type sha1PasswordHasher struct {
 }
 
-func (s *SHA1PasswordHasher) Encoder() func() hash.Hash {
+func (s *sha1PasswordHasher) Encoder() func() hash.Hash {
 	return sha1.New
 }
 
-func (s *SHA1PasswordHasher) Algorithm() string {
+func (s *sha1PasswordHasher) Algorithm() string {
 	return "sha1"
 }
-func (s *SHA1PasswordHasher) Salt() string {
+func (s *sha1PasswordHasher) Salt() string {
 	return GetRandomString(12)
 }
 
-type MD5PasswordHasher struct {
+type md5PasswordHasher struct {
 }
 
-func (m *MD5PasswordHasher) Encoder() func() hash.Hash {
+func (m *md5PasswordHasher) Encoder() func() hash.Hash {
 	return md5.New
 }
-func (m *MD5PasswordHasher) Algorithm() string {
+func (m *md5PasswordHasher) Algorithm() string {
 	return "md5"
 }
-func (s *MD5PasswordHasher) Salt() string {
+func (s *md5PasswordHasher) Salt() string {
 	return GetRandomString(12)
 }
 
@@ -156,6 +161,10 @@ type PBKDF2PasswordHasher struct {
 	configuration Encoderer
 }
 
+func (h *PBKDF2PasswordHasher) Salt() string {
+	return h.configuration.Salt()
+}
+
 func (h *PBKDF2PasswordHasher) Encode(password string, salt string) (string, error) {
 	return h.EncodeIterations(password, salt, h.iterations)
 }
@@ -195,18 +204,57 @@ func (h *PBKDF2PasswordHasher) ShouldUpdate(encoded string) bool {
 	return iterations != h.iterations
 }
 
-//type BCryptPasswordHasher struct {
-//}
-//func (h *BCryptPasswordHasher) Salt() (string) {
-//  // Example from BCryptSHA256PasswordHasher().salt() = $2b$12$nTBSvTeELovV9.lPZLBCtu / $2b$12$zf8jrSLSgnPhy..1H090he
-//	return "???"
-//}
-//func (h *BCryptPasswordHasher) Encode(password string, salt string) (string, error) {
-//	return "", nil
-//}
-//func (h *BCryptPasswordHasher) Verify(password string, encoded string) int {
-//	return 0
-//}
+type BCrypter interface {
+	WrapPassword(string) string
+	Algorithm() string
+}
+
+type bcryptSHA256 struct{}
+
+func (m *bcryptSHA256) WrapPassword(password string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(password))
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	return hash
+}
+func (m *bcryptSHA256) Algorithm() string {
+	return "bcrypt_sha256"
+}
+
+type bcryptNoSHA struct{}
+
+func (m *bcryptNoSHA) WrapPassword(password string) string {
+	return password
+}
+func (m *bcryptNoSHA) Algorithm() string {
+	return "bcrypt"
+}
+
+type BCryptPasswordHasher struct {
+	BCrypter
+}
+
+func (h *BCryptPasswordHasher) Salt() (string) {
+	return ""
+}
+func (h *BCryptPasswordHasher) Encode(password string, salt string) (string, error) {
+	password = h.WrapPassword(password)
+	result, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	return h.Algorithm() + "$" + string(result), err
+}
+func (h *BCryptPasswordHasher) Verify(password string, encoded string) int {
+	split := strings.SplitN(encoded, "$", 2)
+	if split[0] != h.Algorithm() {
+		return 0
+	}
+	password = h.WrapPassword(password)
+	result := bcrypt.CompareHashAndPassword([]byte(split[1]), []byte(password))
+	if result == nil {
+		return 1
+	}
+	return 0
+}
+
 //func (h *BCryptPasswordHasher) ShouldUpdate(encoded string) bool {
 //	return false
 //}
