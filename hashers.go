@@ -17,6 +17,11 @@ import (
 	"strings"
 )
 
+const (
+	UNUSABLE_PASSWORD_PREFIX        = "!"
+	UNUSABLE_PASSWORD_SUFFIX_LENGTH = 40
+)
+
 var (
 	BCrypt             = BCryptPasswordHasher{&bcryptNoSHA{}}
 	BCryptSHA256       = BCryptPasswordHasher{&bcryptSHA256{}}
@@ -43,6 +48,77 @@ var (
 	DJ_15_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 10000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_14_PBKDF2       = PBKDF2PasswordHasher{iterations: 10000, keylen: 32, configuration: &PBKDF2SHA256{}}
 	DJ_14_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 10000, keylen: 20, configuration: &PBKDF2SHA1{}}
+
+	DJ_21_DEFAULTS = []Hasher{
+		&DJ_21_PBKDF2,
+		&DJ_21_PBKDF2_SHA1,
+		&Argon2,
+		&BCryptSHA256,
+	}
+	DJ_20_DEFAULTS = []Hasher{
+		&DJ_20_PBKDF2,
+		&DJ_20_PBKDF2_SHA1,
+		&Argon2,
+		&BCryptSHA256,
+		&BCrypt,
+	}
+	DJ_111_DEFAULTS = []Hasher{
+		&DJ_111_PBKDF2,
+		&DJ_111_PBKDF2_SHA1,
+		&Argon2,
+		&BCryptSHA256,
+		&BCrypt,
+	}
+	DJ_110_DEFAULTS = []Hasher{
+		&DJ_110_PBKDF2,
+		&DJ_110_PBKDF2_SHA1,
+		&Argon2,
+		&BCryptSHA256,
+		&BCrypt,
+	}
+	DJ_19_DEFAULTS = []Hasher{
+		&DJ_19_PBKDF2,
+		&DJ_19_PBKDF2_SHA1,
+		&BCryptSHA256,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
+	DJ_18_DEFAULTS = []Hasher{
+		&DJ_18_PBKDF2,
+		&DJ_18_PBKDF2_SHA1,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
+	DJ_17_DEFAULTS = []Hasher{
+		&DJ_17_PBKDF2,
+		&DJ_17_PBKDF2_SHA1,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
+	DJ_16_DEFAULTS = []Hasher{
+		&DJ_16_PBKDF2,
+		&DJ_16_PBKDF2_SHA1,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
+	DJ_15_DEFAULTS = []Hasher{
+		&DJ_15_PBKDF2,
+		&DJ_15_PBKDF2_SHA1,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
+	DJ_14_DEFAULTS = []Hasher{
+		&DJ_14_PBKDF2,
+		&DJ_14_PBKDF2_SHA1,
+		&BCrypt,
+		&SHA1,
+		&MD5,
+	}
 	//UnsaltedSHA1 = CrapPasswordHasher{configuration: &UnsaltedSHA1PasswordHasher{}}
 	//UnsaltedMD5 = CrapPasswordHasher{configuration: &UnsaltedMD5PasswordHasher{}}
 
@@ -67,8 +143,8 @@ func GetRandomString(length int) string {
 // All the hashers should have this.
 type Hasher interface {
 	Salt() string
-	Verify(string, string) int
-	Encode(string, string) (string, error)
+	Verify(password string, encoded string) int
+	Encode(password string, salt string) (string, error)
 	ShouldUpdate(string) bool
 	//SafeSummary()
 }
@@ -323,4 +399,25 @@ func (h *Argon2PasswordHasher) ShouldUpdate(encoded string) bool {
 	//	self.parallelism != parallelism
 	//	)
 	return false
+}
+
+func IsPasswordUsable(encoded string) bool {
+
+}
+
+func CheckPassword(password string, encoded string, using []Hasher) {
+
+}
+
+func MakePassword(password string, using []Hasher) (string, error) {
+	if strings.TrimSpace(password) == "" {
+		return UNUSABLE_PASSWORD_PREFIX + GetRandomString(UNUSABLE_PASSWORD_SUFFIX_LENGTH), nil
+	}
+	hasher := using[0]
+	salt := hasher.Salt()
+	encoded, err := hasher.Encode(password, salt)
+	if err != nil {
+		return "", err
+	}
+	return encoded, nil
 }
