@@ -31,8 +31,18 @@ var pbkdf2s = []PDBKDF2{
 	{"Django 2.0 PBKDF2, SHA1", "pbkdf2_sha1$100000$woof$9QE012mIl6gN+jWZafzcB4oNHNA=", hashers.DJ_20_PBKDF2_SHA1},
 	{"Django 1.11 (LTS) PBKDF2, SHA256", "pbkdf2_sha256$36000$woof$gOvAuiZY5KyuxBOyLOs5+tovjqb6wEHQsWM0mvRxmNo=", hashers.DJ_111_PBKDF2},
 	{"Django 1.11 (LTS) PBKDF2, SHA1", "pbkdf2_sha1$36000$woof$zcBBwbvZBLdlZyu1uHNmrzlnya4=", hashers.DJ_111_PBKDF2_SHA1},
+	{"Django 1.10 PBKDF2, SHA256", "pbkdf2_sha256$30000$woof$pe1r2Gl7xYZ9S5ruKPc8nKYF6pNZSBa82WlQKZpNhJM=", hashers.DJ_110_PBKDF2},
+	{"Django 1.10 PBKDF2, SHA1", "pbkdf2_sha1$30000$woof$/Wj+/F1nqW5wMsARkRyBeyA6yNE=", hashers.DJ_110_PBKDF2_SHA1},
+	{"Django 1.9 PBKDF2, SHA256", "pbkdf2_sha256$24000$woof$jdSNAG1RZ9GXYhMTJ8ZUkCQRA50OAYKZNV1uNZxdhls=", hashers.DJ_19_PBKDF2},
+	{"Django 1.9 PBKDF2, SHA1", "pbkdf2_sha1$24000$woof$nW5RjF5z/lFYUBT5aCu2KMMRB60=", hashers.DJ_19_PBKDF2_SHA1},
 	{"Django 1.8 (LTS) PBKDF2, SHA256", "pbkdf2_sha256$20000$woof$sJSaMkbt/6mvDBI2khnDNFSwbA8NPmYy/8Ig+s0AsvI=", hashers.DJ_18_PBKDF2},
 	{"Django 1.8 (LTS) PBKDF2, SHA1", "pbkdf2_sha1$20000$woof$X2uxrUctGmCY9TF5Hcw/UT06Z2Q=", hashers.DJ_18_PBKDF2_SHA1},
+	{"Django 1.7 PBKDF2, SHA256", "pbkdf2_sha256$15000$woof$VFlxBpNwrh7zrlgHpHwAJDC2hIsHVG6Ztkbn214Nt4Q=", hashers.DJ_17_PBKDF2},
+	{"Django 1.7 PBKDF2, SHA1", "pbkdf2_sha1$15000$woof$rNKMXe8EmIHqO+5lF44ewm82aiA=", hashers.DJ_17_PBKDF2_SHA1},
+	{"Django 1.6 PBKDF2, SHA256", "pbkdf2_sha256$12000$woof$gzvx8W1M/Z9+OTfjl167CFo60dLDM1C94AOAtMIV1NE=", hashers.DJ_16_PBKDF2},
+	{"Django 1.6 PBKDF2, SHA1", "pbkdf2_sha1$12000$woof$x77qP15WMhB9zTwVVEbKMmTzHO4=", hashers.DJ_16_PBKDF2_SHA1},
+	{"Django 1.5 PBKDF2, SHA256", "pbkdf2_sha256$10000$woof$73V59XxoyKp7dkPM5mlaNu4LqK8s9Lkmbvo6GBanCI8=", hashers.DJ_15_PBKDF2},
+	{"Django 1.5 PBKDF2, SHA1", "pbkdf2_sha1$10000$woof$QB91axouI/E12QORKgNkHAF8o0Y=", hashers.DJ_15_PBKDF2_SHA1},
 	{"Django 1.4 (LTS) PBKDF2, SHA256", "pbkdf2_sha256$10000$woof$73V59XxoyKp7dkPM5mlaNu4LqK8s9Lkmbvo6GBanCI8=", hashers.DJ_14_PBKDF2},
 	{"Django 1.4 (LTS) PBKDF2, SHA1", "pbkdf2_sha1$10000$woof$QB91axouI/E12QORKgNkHAF8o0Y=", hashers.DJ_14_PBKDF2_SHA1},
 }
@@ -161,7 +171,6 @@ func TestBCryptPasswordHasher_Encode_Verify(t *testing.T) {
 
 func TestBCryptSHA256PasswordHasher_Encode_Verify(t *testing.T) {
 	encoded1, _ := hashers.BCryptSHA256.Encode("test", "woofwoofwoof")
-	print(encoded1)
 	t.Run("Encoded by this lib", func(t *testing.T) {
 		result := hashers.BCryptSHA256.Verify("test", encoded1)
 		if result == 0 {
