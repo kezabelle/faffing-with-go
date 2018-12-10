@@ -31,8 +31,8 @@ var (
 	DJ_111_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 36000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_110_PBKDF2      = PBKDF2PasswordHasher{iterations: 30000, keylen: 32, configuration: &PBKDF2SHA256{}}
 	DJ_110_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 30000, keylen: 20, configuration: &PBKDF2SHA1{}}
-	DJ_19_PBKDF2      = PBKDF2PasswordHasher{iterations: 24000, keylen: 32, configuration: &PBKDF2SHA256{}}
-	DJ_19_PBKDF2_SHA1 = PBKDF2PasswordHasher{iterations: 24000, keylen: 20, configuration: &PBKDF2SHA1{}}
+	DJ_19_PBKDF2       = PBKDF2PasswordHasher{iterations: 24000, keylen: 32, configuration: &PBKDF2SHA256{}}
+	DJ_19_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 24000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_18_PBKDF2       = PBKDF2PasswordHasher{iterations: 20000, keylen: 32, configuration: &PBKDF2SHA256{}}
 	DJ_18_PBKDF2_SHA1  = PBKDF2PasswordHasher{iterations: 20000, keylen: 20, configuration: &PBKDF2SHA1{}}
 	DJ_17_PBKDF2       = PBKDF2PasswordHasher{iterations: 15000, keylen: 32, configuration: &PBKDF2SHA256{}}
@@ -244,7 +244,7 @@ type BCryptPasswordHasher struct {
 	BCrypter
 }
 
-func (h *BCryptPasswordHasher) Salt() (string) {
+func (h *BCryptPasswordHasher) Salt() string {
 	return ""
 }
 func (h *BCryptPasswordHasher) Encode(password string, salt string) (string, error) {
@@ -282,7 +282,7 @@ var argon2config = argon2.Config{
 type Argon2PasswordHasher struct {
 }
 
-func (h *Argon2PasswordHasher) Salt() (string) {
+func (h *Argon2PasswordHasher) Salt() string {
 	return GetRandomString(12)
 }
 func (h *Argon2PasswordHasher) Encode(password string, salt string) (string, error) {
