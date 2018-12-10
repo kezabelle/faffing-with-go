@@ -69,7 +69,7 @@ type Hasher interface {
 	Salt() string
 	Verify(string, string) int
 	Encode(string, string) (string, error)
-	//ShouldUpdate() bool
+	ShouldUpdate(string) bool
 	//SafeSummary()
 }
 
@@ -265,9 +265,14 @@ func (h *BCryptPasswordHasher) Verify(password string, encoded string) int {
 	return 0
 }
 
-//func (h *BCryptPasswordHasher) ShouldUpdate(encoded string) bool {
-//	return false
-//}
+func (h *BCryptPasswordHasher) ShouldUpdate(encoded string) bool {
+	split := strings.SplitN(encoded, "$", 5)
+	rounds, err := strconv.Atoi(split[4])
+	if err != nil {
+		return false
+	}
+	return rounds != 12
+}
 
 var argon2config = argon2.Config{
 	HashLength:  16,
@@ -304,7 +309,18 @@ func (h *Argon2PasswordHasher) Verify(password string, encoded string) int {
 	return 1
 }
 
-//
-//func (h *Argon2PasswordHasher) ShouldUpdate(encoded string) bool {
-//	return false
-//}
+func (h *Argon2PasswordHasher) ShouldUpdate(encoded string) bool {
+	// TODO: implement as below
+	//def must_update(self, encoded):
+	//	(algorithm, variety, version, time_cost, memory_cost, parallelism,
+	//		salt, data) = self._decode(encoded)
+	//	assert algorithm == self.algorithm
+	//	argon2 = self._load_library()
+	//	return (
+	//		argon2.low_level.ARGON2_VERSION != version or
+	//	self.time_cost != time_cost or
+	//	self.memory_cost != memory_cost or
+	//	self.parallelism != parallelism
+	//	)
+	return false
+}
